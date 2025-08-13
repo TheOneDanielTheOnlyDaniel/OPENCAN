@@ -316,7 +316,7 @@
 
   <div id="can-orbit-wrapper" aria-label="Can display area" role="img">
     <div id="can-wrapper">
-      <img src="images/Cans/DutchCola.png" alt="Main Dutch Cola Can" class="can-image main-can" id="main-can" />
+      <img src="Images/Cans/DutchCola.png" alt="Main Dutch Cola Can" class="can-image main-can" id="main-can" />
     </div>
   </div>
 
@@ -542,7 +542,7 @@
 
     for(let i=0; i < usedCount; i++) {
       const can = document.createElement('img');
-      can.src = 'images/cans/DutchCola.png';
+      can.src = 'Images/Cans/DutchCola.png';
       can.alt = 'Extra Can';
       can.className = 'orbit-can';
       can.style.width = size + 'px';
@@ -610,7 +610,7 @@
   }
 
   const shopItems = [
-    { id: 'DutchCola', name: 'Dutch Cola', price: 0, image: 'images/cans/DutchCola.png' },
+    { id: 'DutchCola', name: 'Dutch Cola', price: 0, image: 'Images/Cans/DutchCola.png' },
     { id: 'BalloonCOLA', name: 'Balloon Cola', price: 100, image: 'images/canshop/BalloonCOLA.png' },
     { id: 'NotBeer', name: 'Not Beer', price: 200, image: 'images/canshop/NotBeer.png' },
     { id: 'WATER', name: 'Water', price: 300, image: 'images/canshop/WATER.png' }
@@ -775,6 +775,8 @@
       }
     }
   }
+
+
 
   // Power-ups
   function spawnPowerUp() {
