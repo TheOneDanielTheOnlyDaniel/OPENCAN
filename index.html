@@ -166,6 +166,78 @@
         max-width: 320px;
   }
 
+  #shop-menu {
+    display: none;
+    position: fixed;
+    top: 50%;
+    right: 32px;
+    transform: translateY(-50%);
+    background: white;
+    padding: 24px;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    z-index: 3000;
+    width: 400px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 20px;
+    padding: 16px;
+  }
+
+  .shop-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px;
+    background: #f8f8f8;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+
+  .shop-item:hover {
+    transform: scale(1.05);
+  }
+
+  .shop-item img {
+    width: 100px;
+    height: auto;
+    margin-bottom: 8px;
+  }
+
+  .shop-item.owned {
+    border: 2px solid #2a7;
+  }
+
+  .shop-item.equipped {
+    background: #e6f7ef;
+  }
+
+  #shop-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+  }
+
+  #hidden-image {
+    position: fixed;
+    width: 100px;
+    height: auto;
+    pointer-events: none;
+    z-index: 9000;
+    opacity: 0;
+    transition: transform 8s linear, opacity 0.5s ease;
+  }
 
 </style>
 </head>
@@ -192,7 +264,16 @@
   <div id="floating-dock" role="region" aria-label="Action buttons">
     <button id="speed-btn">Train To Increase Max Speed (20 Coins)</button>
     <button id="buy-can-btn">Buy Extra Can (50 Coins)</button>
+    <button id="shop-btn">Can Shop</button>
   </div>
+
+  <div id="shop-menu">
+    <button id="shop-close">&times;</button>
+    <h2>Can Shop</h2>
+    <div class="shop-grid"></div>
+  </div>
+
+  <img id="hidden-image" src="images/Hidden.png" alt="Hidden Image">
 
   <script>
   const soundFiles = [
@@ -210,10 +291,16 @@
   const orbitWrapper = document.getElementById('can-orbit-wrapper');
   const muteBtn = document.getElementById('mute-button');
   const bottomLeftText = document.getElementById('bottom-left-text');
+  const shopBtn = document.getElementById('shop-btn');
+  const shopMenu = document.getElementById('shop-menu');
+  const shopClose = document.getElementById('shop-close');
+  const shopGrid = document.querySelector('.shop-grid');
 
   let canOpenCount = parseInt(getCookie('canOpenCount') || '0', 10) || 0;
   let coins = parseFloat(getCookie('coins') || '0') || 0;
   let extraCans = parseInt(getCookie('extraCans') || '0', 10) || 0;
+  let ownedCans = JSON.parse(getCookie('ownedCans') || '["DutchCola"]');
+  let equippedCan = getCookie('equippedCan') || 'DutchCola';
   let clickCooldown = parseInt(getCookie('clickCooldown') || '1000', 10) || 1000;
   let canOpenTimeout = false;
   let muted = (getCookie('muted') === 'true') || false;
@@ -228,6 +315,107 @@
   const COIN_PER_EXTRA_CAN = 0.2;
 
   let orbitCans = [];
+  
+  // Confetti configuration
+  const confetti = {
+    maxCount: 250, // More particles
+    speed: 2,
+    gravity: 0.3, // Lower gravity for longer air time
+    particles: [],
+    colors: [
+      '#FF69B4', // Hot Pink
+      '#FFD700', // Gold
+      '#FF4500', // Orange Red
+      '#7FFF00', // Lawn Green
+      '#00FFFF', // Cyan
+      '#FF1493', // Deep Pink
+      '#9400D3', // Violet
+      '#00FF7F', // Spring Green
+      '#FFB6C1', // Light Pink
+      '#00CED1'  // Dark Turquoise
+    ],
+    
+    createParticle() {
+      // Create particles from random positions at the top of the screen
+      const x = Math.random() * window.innerWidth;
+      const y = -20; // Start slightly above the screen
+      return {
+        x,
+        y,
+        size: Math.random() * 8 + 6, // Slightly larger particles
+        color: this.colors[Math.floor(Math.random() * this.colors.length)],
+        speedX: Math.random() * 12 - 6, // Wider horizontal spread
+        speedY: Math.random() * -15 - 5, // Higher initial upward velocity
+        rotation: Math.random() * 360,
+        rotationSpeed: (Math.random() - 0.5) * 15 // More rotation
+      };
+    },
+    
+    startConfetti() {
+      this.particles = [];
+      // Create particles from multiple points across the screen
+      for(let i = 0; i < this.maxCount; i++) {
+        // Create particles from both bottom corners and center
+        if (i % 3 === 0) {
+          // Left side
+          this.particles.push(this.createParticle());
+        } else if (i % 3 === 1) {
+          // Right side
+          this.particles.push(this.createParticle());
+        } else {
+          // Center
+          this.particles.push(this.createParticle());
+        }
+      }
+      this.animate();
+    },
+    
+    animate() {
+      if (this.particles.length === 0) return;
+      
+      const canvas = document.createElement('canvas');
+      canvas.style.position = 'fixed';
+      canvas.style.top = '0';
+      canvas.style.left = '0';
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      canvas.style.pointerEvents = 'none';
+      canvas.style.zIndex = '9999';
+      document.body.appendChild(canvas);
+      
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+      
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        this.particles = this.particles.filter(p => {
+          p.x += p.speedX;
+          p.y += p.speedY;
+          p.speedY += this.gravity;
+          p.rotation += p.rotationSpeed;
+          
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rotation * Math.PI / 180);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+          ctx.restore();
+          
+          return p.y < canvas.height + p.size;
+        });
+        
+        if (this.particles.length > 0) {
+          requestAnimationFrame(animate);
+        } else {
+          document.body.removeChild(canvas);
+        }
+      };
+      
+      animate();
+    }
+  };
 
   function setCookie(name, value, days=365) {
     const d = new Date();
@@ -322,8 +510,16 @@
 
     // Calculate coins gained per click
     const coinGain = COIN_BASE_PER_CLICK + (extraCans * COIN_PER_EXTRA_CAN);
+    const oldCoins = Math.floor(coins / 100);  // Get previous hundreds
     canOpenCount++;
     coins += coinGain;
+    const newCoins = Math.floor(coins / 100);  // Get new hundreds
+
+    // If we crossed a multiple of 100
+    if (newCoins > oldCoins) {
+      confetti.startConfetti();
+      showFloatingMessage('🎉 +100 Coins Milestone! 🎉');
+    }
 
     updateUI();
     showFloatingMessage(`+${coinGain.toFixed(1)} coins!`);
@@ -342,7 +538,81 @@
     setCookie('extraCans', extraCans);
     setCookie('clickCooldown', clickCooldown);
     setCookie('muted', muted);
+    setCookie('ownedCans', JSON.stringify(ownedCans));
+    setCookie('equippedCan', equippedCan);
   }
+
+  const shopItems = [
+    { id: 'DutchCola', name: 'Dutch Cola', price: 0, image: 'images/cans/DutchCola.png' },
+    { id: 'BalloonCOLA', name: 'Balloon Cola', price: 100, image: 'images/canshop/BalloonCOLA.png' },
+    { id: 'NotBeer', name: 'Not Beer', price: 200, image: 'images/canshop/NotBeer.png' },
+    { id: 'WATER', name: 'Water', price: 300, image: 'images/canshop/WATER.png' }
+  ];
+
+  function updateShop() {
+    shopGrid.innerHTML = '';
+    shopItems.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'shop-item';
+      if (ownedCans.includes(item.id)) {
+        div.classList.add('owned');
+        if (equippedCan === item.id) {
+          div.classList.add('equipped');
+        }
+      }
+
+      const img = document.createElement('img');
+      img.src = item.image;
+      img.alt = item.name;
+
+      const name = document.createElement('div');
+      name.textContent = item.name;
+
+      const price = document.createElement('div');
+      if (ownedCans.includes(item.id)) {
+        price.textContent = equippedCan === item.id ? 'Equipped' : 'Click to Equip';
+      } else {
+        price.textContent = `${item.price} Coins`;
+      }
+
+      div.appendChild(img);
+      div.appendChild(name);
+      div.appendChild(price);
+
+      div.addEventListener('click', () => {
+        if (ownedCans.includes(item.id)) {
+          if (equippedCan !== item.id) {
+            equippedCan = item.id;
+            mainCan.src = item.image;
+            saveState();
+            updateShop();
+          }
+        } else if (coins >= item.price) {
+          coins -= item.price;
+          ownedCans.push(item.id);
+          equippedCan = item.id;
+          mainCan.src = item.image;
+          updateUI();
+          saveState();
+          updateShop();
+          showFloatingMessage('Can purchased!');
+        } else {
+          showFloatingMessage('Not enough coins!');
+        }
+      });
+
+      shopGrid.appendChild(div);
+    });
+  }
+
+  shopBtn.addEventListener('click', () => {
+    shopMenu.style.display = 'block';
+    updateShop();
+  });
+
+  shopClose.addEventListener('click', () => {
+    shopMenu.style.display = 'none';
+  });
 
   speedBtn.addEventListener('click', () => {
     if(coins >= 20 && clickCooldown > MIN_COOLDOWN) {
@@ -383,6 +653,85 @@
   createOrbitCans(extraCans);
   updateUI();
   animateOrbit();
+
+  // Hidden image animation
+  const hiddenImage = document.getElementById('hidden-image');
+  
+  // Debug flag (default: 0)
+  window.debug = 0;
+  
+  // Add debug commands to window object
+  window.debughidden = function() {
+    if (window.debug !== 1) {
+      console.log('Debug mode is not enabled. Set debug = 1 first.');
+      return;
+    }
+    console.log('Debug: Triggering hidden image animation');
+    moveHiddenImage();
+  };
+  
+  // Also add it without parentheses for easier console access
+  window.hiddenimage = function() {
+    if (window.debug !== 1) {
+      console.log('Debug mode is not enabled. Set debug = 1 first.');
+      return;
+    }
+    console.log('Debug: Triggering hidden image animation');
+    moveHiddenImage();
+  };
+  
+  // Add keyboard shortcut (press H key)
+  document.addEventListener('keydown', (e) => {
+    if (e.key.toLowerCase() === 'h' && window.debug === 1) {
+      console.log('Debug: Triggered by H key');
+      moveHiddenImage();
+    }
+  });
+  
+  function moveHiddenImage() {
+    if (!hiddenImage) {
+      console.error('Hidden image element not found!');
+      return;
+    }
+    
+    // Visual feedback
+    showFloatingMessage('Hidden image activated!');
+    
+    // Random direction (left-to-right or right-to-left)
+    const goingRight = Math.random() < 0.5;
+    
+    // Random vertical position
+    const verticalPos = Math.random() * (window.innerHeight - 100);
+    
+    // Set initial position
+    hiddenImage.style.top = verticalPos + 'px';
+    hiddenImage.style.transform = `translateX(${goingRight ? '-100px' : 'calc(100vw + 100px)'})`; // Start outside screen
+    hiddenImage.style.opacity = '1';
+    
+    // After a small delay, start moving
+    setTimeout(() => {
+      hiddenImage.style.transform = `translateX(${goingRight ? 'calc(100vw + 100px)' : '-100px'})`; // Move to other side
+      
+      // Hide the image after animation
+      setTimeout(() => {
+        hiddenImage.style.opacity = '0';
+        // Schedule next appearance
+        scheduleNextAppearance();
+      }, 8000); // Match the transition duration
+    }, 100);
+  }
+
+  function scheduleNextAppearance() {
+    // Random time between 30 seconds and 5 minutes
+    const minTime = 30 * 1000; // 30 seconds
+    const maxTime = 5 * 60 * 1000; // 5 minutes
+    const delay = Math.random() * (maxTime - minTime) + minTime;
+    
+    setTimeout(moveHiddenImage, delay);
+  }
+
+  // Start the cycle
+  scheduleNextAppearance();
 
   </script>
 </body>
